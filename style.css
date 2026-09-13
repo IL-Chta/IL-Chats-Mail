@@ -18,3 +18,5 @@ html,body{height:100%;overflow:hidden}.shell{height:100vh;height:100dvh;min-heig
 .side-link:hover,.send-btn:hover,.toolbar button:hover{box-shadow:0 0 18px rgba(19,201,255,.28),0 0 26px rgba(255,39,237,.12);transform:translateY(-1px)}
 #proMailBtn:hover{box-shadow:0 0 18px rgba(255,212,76,.25),0 0 24px rgba(19,201,255,.18)}
 @media(max-width:760px){.login-logo-frame{max-width:620px}}
+.mail-handle{display:flex;align-items:center;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#071523}.mail-handle input{border:0!important;border-radius:0!important;flex:1;min-width:0}.mail-handle b{padding:0 14px;color:#55dff4;white-space:nowrap}
+.mail-address-preview{margin:4px 0 14px;color:var(--muted);line-height:1.5}.mail-address-preview strong{color:var(--cyan);word-break:break-all}

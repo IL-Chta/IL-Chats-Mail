@@ -73,7 +73,7 @@
       <h1 id="loginTitle">Bem-vindo ao <span>IL Chats Mail</span></h1>
       <p class="login-subtitle">A sua comunicação, mais simples e segura.</p>
       <form id="loginForm" class="auth-form">
-        <label><span>E-mail</span><input id="loginEmail" type="email" autocomplete="email" placeholder="seuemail@exemplo.com" required></label>
+        <label><span>Endereço IL Chats Mail</span><input id="loginEmail" autocomplete="username" placeholder="seunome ou seunome@ilchats.com" required></label>
         <label><span>Senha</span><div class="password-field"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Sua senha" required><button type="button" id="togglePassword" aria-label="Mostrar ou ocultar senha">◉</button></div></label>
         <div class="login-options"><label class="remember"><input id="rememberMe" type="checkbox"> Lembrar de mim</label><button type="button" class="text-btn" id="forgotPasswordBtn">Esqueci minha senha</button></div>
         <button type="submit" class="login-primary">Entrar</button>
@@ -90,7 +90,8 @@
     <form id="signupForm">
       <div class="modal-title"><b>Criar conta no IL Chats Mail</b><button type="button" class="dialog-close" data-close="signupDialog">×</button></div>
       <label>Nome <input id="signupName" autocomplete="name" placeholder="Seu nome" required></label>
-      <label>E-mail <input id="signupEmail" type="email" autocomplete="email" placeholder="seuemail@exemplo.com" required></label>
+      <label>Escolha seu endereço IL Chats Mail <span class="mail-handle"><input id="signupHandle" autocomplete="username" inputmode="email" maxlength="32" placeholder="seunome" required><b>@ilchats.com</b></span></label>
+      <p class="mail-address-preview">Seu endereço IL Chats Mail será:<br><strong id="signupAddressPreview">seunome@ilchats.com</strong></p>
       <label>Senha <input id="signupPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Mínimo de 8 caracteres" required></label>
       <div class="auth-message" id="signupMessage" role="status" aria-live="polite"></div>
       <div class="compose-footer"><button type="button" class="secondary dialog-close" data-close="signupDialog">Cancelar</button><button type="submit" class="send-btn">Criar conta</button></div>
@@ -100,10 +101,12 @@
   <dialog id="resetDialog" class="modal auth-modal">
     <form id="resetForm">
       <div class="modal-title"><b>Recuperar senha</b><button type="button" class="dialog-close" data-close="resetDialog">×</button></div>
-      <p>Enviaremos um link de recuperação para o seu e-mail.</p>
-      <label>E-mail <input id="resetEmail" type="email" autocomplete="email" required></label>
+      <p>Use o código de recuperação que foi mostrado quando sua conta foi criada.</p>
+      <label>Endereço IL Chats Mail <input id="resetEmail" autocomplete="username" placeholder="seunome ou seunome@ilchats.com" required></label>
+      <label>Código de recuperação <input id="recoveryCode" autocomplete="off" required></label>
+      <label>Nova senha <input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></label>
       <div class="auth-message" id="resetMessage" role="status" aria-live="polite"></div>
-      <div class="compose-footer"><button type="button" class="secondary dialog-close" data-close="resetDialog">Cancelar</button><button type="submit" class="send-btn">Enviar link</button></div>
+      <div class="compose-footer"><button type="button" class="secondary dialog-close" data-close="resetDialog">Cancelar</button><button type="submit" class="send-btn">Alterar senha</button></div>
     </form>
   </dialog>
 
@@ -182,7 +185,7 @@
   <dialog id="settingsDialog" class="modal settings-modal">
     <form method="dialog" id="settingsForm">
       <div class="modal-title"><b>Configurações — Minha Marca</b><button value="cancel">×</button></div>
-      <p>Cadastre sua assinatura profissional. Ela fica salva apenas neste navegador nesta versão.</p>
+      <p>Cadastre sua assinatura profissional. Ela fica salva com segurança na sua conta.</p>
       <label>Nome / empresa <input id="sigName" placeholder="Ex.: Ildebrando Leandro"></label>
       <label>Cargo ou descrição <input id="sigRole" placeholder="Ex.: Marketing • IL Chats Mail"></label>
       <label>Telefone <input id="sigPhone" placeholder="+55 ..."></label>
