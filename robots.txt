@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://il-chta.github.io/IL-Chats-Mail/sitemap.xml
