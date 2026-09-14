@@ -172,7 +172,7 @@
 
   <dialog id="composeDialog" class="modal compose-modal">
     <form method="dialog" id="composeForm">
-      <div class="modal-title"><b>Nova mensagem</b><button value="cancel" aria-label="Fechar">×</button></div>
+            <div class="modal-title"><b>Nova mensagem</b><button type="button" class="dialog-close" data-close="composeDialog" aria-label="Fechar">×</button></div>
       <label>Para <input id="toInput" type="email" placeholder="destinatario@exemplo.com" required></label>
       <label>Assunto <input id="subjectInput" placeholder="Assunto"></label>
       <div class="editor-tools"><button type="button" id="brandToggle">🏷 Minha Marca</button><label class="file-label">📎 Anexar<input type="file" id="attachInput" multiple hidden></label><span id="attachInfo"></span></div>
