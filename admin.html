@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Administração — IL Chats Mail</title>
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#03101d">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+  <link rel="stylesheet" href="admin.css?v=20260917-2">
+</head>
+<body>
+  <main class="page">
+    <nav class="nav">
+      <strong>IL CHATS MAIL — ADMINISTRAÇÃO</strong>
+      <a class="back" href="index.html">← Voltar ao e-mail</a>
+    </nav>
+
+    <section class="hero" aria-label="IL Chats Mail">
+      <div class="logo-stage">
+        <div class="globe" aria-hidden="true"></div>
+        <div class="logo-frame">
+          <img class="logo" src="assets/il-chats-mail-logo.png" alt="IL Chats Mail">
+        </div>
+        <span class="lion-orbit" aria-hidden="true"></span>
+        <span class="lion-orbit two" aria-hidden="true"></span>
+        <span class="spark" aria-hidden="true"></span>
+      </div>
+    </section>
+
+
+    <section id="adminLogin" class="admin-login">
+      <div class="login-card">
+        <p class="eyebrow">ACESSO RESTRITO</p>
+        <h1>Administração IL Chats Mail</h1>
+        <p class="muted">Entre com uma conta autorizada como administradora.</p>
+        <form id="adminLoginForm" autocomplete="on">
+          <label for="adminEmail">E-mail</label>
+          <input id="adminEmail" name="email" type="email" autocomplete="username" required>
+          <label for="adminPassword">Senha</label>
+          <input id="adminPassword" name="password" type="password" autocomplete="current-password" required>
+          <button class="primary login-submit" type="submit">Entrar</button>
+          <p id="loginError" class="login-error" role="alert"></p>
+        </form>
+        <a class="mail-link" href="index.html">← Voltar ao e-mail</a>
+      </div>
+    </section>
+
+    <section id="loading" class="status hidden">Verificando acesso administrativo…</section>
+
+    <section id="denied" class="status danger hidden">
+      <h1>Acesso restrito</h1>
+      <p>Esta página é exclusiva para administradores autorizados do IL Chats Mail.</p>
+      <a class="primary" href="index.html">Voltar ao e-mail</a>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <header class="dashboard-head">
+        <div>
+          <p class="eyebrow">PAINEL GERAL</p>
+          <h1>Área do Administrador</h1>
+          <p id="adminIdentity" class="muted"></p>
+        </div>
+        <button id="refreshBtn" class="primary" type="button">Atualizar dados</button>
+      </header>
+
+      <div class="stats">
+        <article><span>Contas cadastradas</span><strong id="registered">—</strong></article>
+        <article><span>Ativos nos últimos 7 dias</span><strong id="active7d">—</strong></article>
+        <article><span>Mensagens registradas</span><strong id="messages">—</strong></article>
+        <article><span>Acessos registrados</span><strong id="visits">—</strong></article>
+        <article><span>Leads</span><strong id="leads">—</strong></article>
+        <article><span>Clientes</span><strong id="customers">—</strong></article>
+        <article><span>Conversão</span><strong id="conversion">—</strong></article>
+      </div>
+
+      <div class="grid">
+        <article class="panel">
+          <div class="panel-title">
+            <div>
+              <p class="eyebrow">LOCALIZAÇÃO APROXIMADA</p>
+              <h2>Países dos acessos</h2>
+            </div>
+          </div>
+          <div id="countries" class="countries"></div>
+          <p class="privacy-note">A localização exibida depende apenas dos dados de acesso que o sistema já tiver registrado. Nenhuma localização exata é mostrada.</p>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">STATUS</p>
+          <h2>Resumo do sistema</h2>
+          <div class="system-list">
+            <div><span>Supabase</span><b id="supabaseStatus">Conectando…</b></div>
+            <div><span>Sessão administrativa</span><b id="sessionStatus">Verificando…</b></div>
+            <div><span>Última atualização</span><b id="lastUpdate">—</b></div>
+          </div>
+        </article>
+      </div>
+
+      <article class="panel">
+        <p class="eyebrow">PRIVACIDADE E SEGURANÇA</p>
+        <h2>Dados protegidos</h2>
+        <p class="muted">O painel não exibe senhas, códigos de recuperação, chaves privadas, tokens ou credenciais dos usuários.</p>
+      </article>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-config.js?v=20260916-1"></script>
+  <script src="admin.js?v=20260917-2"></script>
+</body>
+</html>
