@@ -1,4 +1,4 @@
-.select('email,avatar_url')/* IL Chats Mail v6 — Supabase Auth + caixa postal interna + preparação segura para e-mail externo.
+/* IL Chats Mail v6 — Supabase Auth + caixa postal interna + preparação segura para e-mail externo.
    Nenhum segredo deve ser colocado neste arquivo. */
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 let sb=null,currentUser=null,currentFolder='inbox',messages=[],selectedId=null,useBrand=false,currentDraftId=null,pendingLogo=null,currentSignature={};
