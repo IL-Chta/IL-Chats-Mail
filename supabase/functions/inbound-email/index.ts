@@ -11,7 +11,8 @@ Deno.serve(async(req)=>{try{
   const admin=createClient(url,service),d=event.data||{},providerId=String(d.email_id||"");
   if(!providerId)return json({error:"Missing email id"},400);
   const recipients=(Array.isArray(d.to)?d.to:[d.to]).filter(Boolean).map(cleanAddress);
-  const {data:profile}=await admin.from("profiles").select("id,email").in("email",recipients).limit(1).maybeSingle();
+  let {data:profile}=await admin.from("profiles").select("id,email").in("email",recipients).limit(1).maybeSingle();
+  if(!profile){const {data:candidates}=await admin.from("profiles").select("id,email").ilike("email","%@ilchatsmail.com.br").limit(2);if(candidates?.length===1)profile=candidates[0]}
   if(!profile)return json({ok:true,ignored:true});
   const {data:existing}=await admin.from("messages").select("id").eq("external_message_id",providerId).maybeSingle();
   if(existing)return json({ok:true,duplicate:true,message_id:existing.id});
