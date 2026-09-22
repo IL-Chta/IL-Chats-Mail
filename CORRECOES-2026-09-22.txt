@@ -1,0 +1,10 @@
+IL CHATS MAIL — correções de 22/09/2026
+
+1. Removido o texto indevido "app.js?v=20260921-13" que aparecia no topo da página.
+2. Corrigido o domínio interno para @ilchatsmail.com.br.
+3. Envio: ao receber confirmação de envio, a janela de composição fecha imediatamente, limpa o formulário, mostra "Mensagem enviada" e abre Enviados.
+4. Envio: se a chamada da função retornar erro/timeout depois de o servidor já ter marcado a mensagem como sent, o app confirma o status no banco e não mostra falso erro ao usuário.
+5. Perfil: carregamento da foto ficou mais resistente a falha/cache de imagem, mantendo fallback de iniciais apenas quando necessário.
+6. Atualizado cache-buster do app.js para v=20260922-14.
+
+Não foram alterados Resend, DNS/Registro.br ou outro projeto.
