@@ -1,0 +1,24 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
+const json=(body:unknown,status=200)=>Response.json(body,{status,headers:cors});
+const hex=async(v:string)=>{const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,"0")).join("")};
+const newCode=()=>{const b=crypto.getRandomValues(new Uint8Array(15));return [...b].map(x=>x.toString(16).padStart(2,"0")).join("").match(/.{1,5}/g)!.join("-").toUpperCase()};
+Deno.serve(async(req)=>{try{
+ if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
+ if(req.method!=="POST")return json({ok:false},405);
+ const url=Deno.env.get("SUPABASE_URL"),service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+ if(!url||!service)return json({ok:false},503);
+ const {email,recovery_code,new_password}=await req.json();
+ if(!email||!recovery_code||typeof new_password!=="string"||new_password.length<8)return json({ok:false},400);
+ const admin=createClient(url,service);
+ const {data:{users},error:listError}=await admin.auth.admin.listUsers({page:1,perPage:1000});
+ if(listError)return json({ok:false},500);
+ const user=users.find(u=>u.email?.toLowerCase()===String(email).trim().toLowerCase());
+ if(!user)return json({ok:false},400);
+ const {data:cred}=await admin.from("recovery_credentials").select("recovery_hash").eq("user_id",user.id).maybeSingle();
+ if(!cred||cred.recovery_hash!==await hex(String(recovery_code).trim().toUpperCase()))return json({ok:false},400);
+ const {error:updateError}=await admin.auth.admin.updateUserById(user.id,{password:new_password});
+ if(updateError)return json({ok:false},500);
+ const code=newCode(); await admin.from("recovery_credentials").upsert({user_id:user.id,recovery_hash:await hex(code),updated_at:new Date().toISOString()});
+ return json({ok:true,recovery_code:code});
+ }catch(e){console.error(e);return json({ok:false},500)}});

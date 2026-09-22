@@ -1,0 +1,8 @@
+IL Chats Mail — versão @ilchats.com.br
+
+- Novos cadastros: usuario@ilchats.com.br
+- Login digitando apenas o nome: completa @ilchats.com.br
+- Login com endereço completo antigo continua aceito, preservando o administrador ildebrando@ilchats.com
+- Recuperação de senha também aceita endereço completo antigo
+- Nenhuma configuração de Resend, Registro.br ou DNS foi alterada
+- Antes/depois da publicação, execute ATUALIZAR-DOMINIO-ILCHATS-COM-BR.sql no SQL Editor do projeto correto.
