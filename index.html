@@ -79,7 +79,7 @@
       <h1 id="loginTitle">Bem-vindo ao <span>IL Chats Mail</span></h1>
       <p class="login-subtitle">A sua comunicação, mais simples e segura.</p>
       <form id="loginForm" class="auth-form">
-        <label><span>Endereço IL Chats Mail</span><input id="loginEmail" autocomplete="username" placeholder="seunome ou seunome@ilchats.com.br" required></label>
+        <label><span>Endereço IL Chats Mail</span><input id="loginEmail" autocomplete="username" placeholder="seunome ou seunome@ilchatsmail.com.br" required></label>
         <label><span>Senha</span><div class="password-field"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Sua senha" required><button type="button" id="togglePassword" aria-label="Mostrar ou ocultar senha">◉</button></div></label>
         <div class="login-options"><label class="remember"><input id="rememberMe" type="checkbox"> Lembrar de mim</label><button type="button" class="text-btn" id="forgotPasswordBtn">Esqueci minha senha</button></div>
         <button type="submit" class="login-primary">Entrar</button>
@@ -97,8 +97,8 @@
     <form id="signupForm">
       <div class="modal-title"><b>Criar conta no IL Chats Mail</b><button type="button" class="dialog-close" data-close="signupDialog">×</button></div>
       <label>Nome <input id="signupName" autocomplete="name" placeholder="Seu nome" required></label>
-      <label>Escolha seu endereço IL Chats Mail <span class="mail-handle"><input id="signupHandle" autocomplete="username" inputmode="email" maxlength="32" placeholder="seunome" required><b>@ilchats.com.br</b></span></label>
-      <p class="mail-address-preview">Seu endereço IL Chats Mail será:<br><strong id="signupAddressPreview">seunome@ilchats.com.br</strong></p>
+      <label>Escolha seu endereço IL Chats Mail <span class="mail-handle"><input id="signupHandle" autocomplete="username" inputmode="email" maxlength="32" placeholder="seunome" required><b>@ilchatsmail.com.br</b></span></label>
+      <p class="mail-address-preview">Seu endereço IL Chats Mail será:<br><strong id="signupAddressPreview">seunome@ilchatsmail.com.br</strong></p>
       <label>Senha <input id="signupPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Mínimo de 8 caracteres" required></label>
       <div class="auth-message" id="signupMessage" role="status" aria-live="polite"></div>
       <div class="compose-footer"><button type="button" class="secondary dialog-close" data-close="signupDialog">Cancelar</button><button type="submit" class="send-btn">Criar conta</button></div>
@@ -109,7 +109,7 @@
     <form id="resetForm">
       <div class="modal-title"><b>Recuperar senha</b><button type="button" class="dialog-close" data-close="resetDialog">×</button></div>
       <p>Use o código de recuperação que foi mostrado quando sua conta foi criada.</p>
-      <label>Endereço IL Chats Mail <input id="resetEmail" autocomplete="username" placeholder="seunome ou seunome@ilchats.com.br" required></label>
+      <label>Endereço IL Chats Mail <input id="resetEmail" autocomplete="username" placeholder="seunome ou seunome@ilchatsmail.com.br" required></label>
       <label>Código de recuperação <input id="recoveryCode" autocomplete="off" required></label>
       <label>Nova senha <input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></label>
       <div class="auth-message" id="resetMessage" role="status" aria-live="polite"></div>
@@ -242,6 +242,6 @@
   <div class="toast" id="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="supabase-config.js?v=20260916-1"></script>
-    <script src="app.js?v=20260922-16"></script>
+    <script src="app.js?v=20260922-15"></script>
 </body>
 </html>
