@@ -8,8 +8,8 @@ function toast(t){const el=$('#toast');if(!el)return;el.textContent=t;el.classLi
 function setAuthMessage(el,text,ok=false){if(!el)return;el.textContent=text||'';el.classList.toggle('ok',!!ok)}
 function supabaseReady(){return !!(window.supabase&&window.ILMAIL_SUPABASE_URL&&window.ILMAIL_SUPABASE_PUBLISHABLE_KEY&&window.ILMAIL_SUPABASE_PUBLISHABLE_KEY!=='COLE_AQUI_SUA_PUBLISHABLE_KEY')}
 function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-const MAIL_DOMAIN='ilchats.com.br';
-function normalizeHandle(value=''){return value.trim().toLowerCase().replace(/@ilchats\.com\.br$/i,'')}
+const MAIL_DOMAIN='ilchatsmail.com.br';
+function normalizeHandle(value=''){return value.trim().toLowerCase().replace(/@(?:ilchatsmail|ilchats)\.com\.br$/i,'')}
 function internalEmail(value=''){return `${normalizeHandle(value)}@${MAIL_DOMAIN}`}
 function loginEmail(value=''){const v=value.trim().toLowerCase();return v.includes('@')?v:internalEmail(v)}
 function validHandle(value=''){return /^[a-z0-9](?:[a-z0-9._-]{1,30}[a-z0-9])?$/.test(normalizeHandle(value))}
@@ -38,6 +38,9 @@ $('#resetForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!sb)r
 $('#accountBtn')?.addEventListener('click',e=>{e.stopPropagation();$('#accountMenu')?.classList.toggle('hidden')});
 document.addEventListener('click',e=>{if(!e.target.closest('#accountMenu')&&!e.target.closest('#accountBtn'))$('#accountMenu')?.classList.add('hidden')});
 $('#logoutBtn')?.addEventListener('click',async e=>{const btn=e.currentTarget,old=btn.textContent;btn.disabled=true;btn.textContent='Saindo…';try{if(!sb)throw new Error('Sessão indisponível');const {error}=await withTimeout(sb.auth.signOut(),15000);if(error)throw error;showLogin()}catch(error){console.error(error);toast('Não foi possível sair: '+(error.message||'erro inesperado'))}finally{btn.disabled=false;btn.textContent=old}});
+function openDeleteAccount(e){e?.preventDefault();if(!currentUser)return;$('#deleteAccountEmail').value=currentUser.email||'';$('#deleteAccountPassword').value='';$('#deleteAccountConfirmation').value='';setAuthMessage($('#deleteAccountMessage'),'');$('#deleteAccountDialog').showModal()}
+$('#deleteAccountTop')?.addEventListener('click',openDeleteAccount);$('#deleteAccountSide')?.addEventListener('click',openDeleteAccount);
+$('#deleteAccountForm')?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,old=btn.textContent;if(!confirm('Tem certeza? Esta exclusão não poderá ser desfeita.'))return;btn.disabled=true;btn.textContent='Excluindo…';setAuthMessage($('#deleteAccountMessage'),'');try{const {data,error}=await sb.functions.invoke('delete-account',{body:{email:$('#deleteAccountEmail').value.trim(),password:$('#deleteAccountPassword').value,confirmation:$('#deleteAccountConfirmation').value.trim()}});if(error||!data?.ok)throw new Error(data?.error||error?.message||'Falha na exclusão');await sb.auth.signOut();$('#deleteAccountDialog').close();showLogin();setAuthMessage(authUi.message,'Sua conta foi excluída.',true)}catch(error){setAuthMessage($('#deleteAccountMessage'),error.message||'Não foi possível excluir a conta.')}finally{btn.disabled=false;btn.textContent=old}});
 function translateError(m=''){if(/Invalid login credentials/i.test(m))return 'Endereço ou senha incorretos.';if(/Email not confirmed/i.test(m))return 'A conta ainda não foi ativada.';if(/User already registered|already been registered/i.test(m))return 'Este endereço já possui uma conta.';if(/Signups not allowed|Signup is disabled|signups.*disabled/i.test(m))return 'Novos cadastros estão desativados no Supabase. Ative Allow new users to sign up em Authentication.';if(/Password should be at least/i.test(m))return 'A senha precisa ter pelo menos 8 caracteres.';return m}
 
 async function loadMailbox(){if(!sb||!currentUser)return;selectedId=null;content.classList.add('hidden');empty.classList.remove('hidden');reader.classList.remove('open');list.innerHTML='<div class="loading-mail">Carregando mensagens…</div>';

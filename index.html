@@ -1,23 +1,12 @@
-  <!doctype html>
-  <html lang="pt-BR">
-  <head>
-  <meta name="google-site-verification" content="0VKYbA2AukvJycHJ6spFriyDdRlbTROe6zbHhtXcmCo">
-
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-D41W1G2ZT1"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-D41W1G2ZT1');
-  </script>
-
+<!doctype html>  
+<html lang="pt-BR">
+<head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>IL Chats Mail — E-mail moderno, seguro e conectado</title>
   <meta name="description" content="Conheça o IL Chats Mail, criado por Ildebrando Leandro: e-mail moderno com identidade própria, anexos, Minha Marca e comunicação profissional." />
   <meta name="keywords" content="IL Chats Mail, e-mail, correio eletrônico, email seguro, anexos, contatos, assinatura profissional, Brasil, Portugal" />
-  <meta name="author" content="IL Chats Mail" PROFESSOR ILDEBRANDO LEANDRO />
+  <meta name="author" content="IL Chats Mail" />
   <meta name="robots" content="index,follow,max-image-preview:large" />
   <meta name="theme-color" content="#03101d" />
   <link rel="canonical" href="https://ilchatsmail.com.br/" />
@@ -143,7 +132,7 @@
       </div>
       <div class="tagline">Suas mensagens,<br><em>mais perto do que importa.</em></div>
       <div class="world"><span>Conectando pessoas<br>no Brasil e no mundo.</span><div class="flags">🇧🇷 🇵🇹</div><small>Segurança • Privacidade • Liberdade</small></div>
-      <nav class="top-legal" aria-label="Privacidade e conta"><a href="privacidade.html">Privacidade</a><a href="exclusao-conta.html">Excluir conta</a></nav>
+      <nav class="top-legal" aria-label="Privacidade e conta"><a href="privacidade.html">Privacidade</a><a href="#" id="deleteAccountTop">Excluir conta</a></nav>
       <button class="account" id="accountBtn"><span class="avatar"><img id="profileAvatarImg" alt="Foto do perfil" hidden style="width:100%;height:100%;object-fit:cover;border-radius:50%"><span id="profileAvatarFallback">IL</span></span><span id="accountDisplayName">Ildebrando</span><span>⌄</span></button>
     </header>
     <div class="account-menu hidden" id="accountMenu"><div id="accountEmail"></div><button type="button" id="profileBtn">Meu perfil</button><button type="button" id="logoutBtn">Sair da conta</button></div>
@@ -168,7 +157,7 @@
         <button class="side-link" id="proMailBtn">◆ <span>E-mail Profissional</span></button>
         <button class="side-link" id="aboutBtn">ⓘ <span>Nossa história</span></button>
         <a class="side-link legal-side" href="privacidade.html">🛡 <span>Privacidade</span></a>
-        <a class="side-link legal-side" href="exclusao-conta.html">⌫ <span>Excluir conta</span></a>
+        <a class="side-link legal-side" href="#" id="deleteAccountSide">⌫ <span>Excluir conta</span></a>
 
         <div class="storage-card"><div><span>☁ Armazenamento</span><b>340 MB de 5 GB</b></div><div class="bar"><i></i></div><small>6%</small></div>
         <div class="promo-card"><img src="assets/favicon-192.png" alt="IL Chats Mail"><div><b>Sua marca no e-mail</b><small>Adicione seu logotipo em poucos cliques.</small></div></div>
@@ -254,10 +243,12 @@
 
   <dialog id="profileDialog" class="modal utility-modal"><div class="modal-title"><b>Meu perfil</b><button type="button" class="dialog-close" data-close="profileDialog">×</button></div><form id="profileForm" class="utility-form"><label>Nome <input id="profileName" required></label><label>Foto <input id="profilePhoto" type="file" accept="image/*"></label><div class="compose-footer"><button class="send-btn" type="submit">Salvar perfil</button></div></form></dialog>
 
+  <dialog id="deleteAccountDialog" class="modal utility-modal"><div class="modal-title"><b>Excluir minha conta</b><button type="button" class="dialog-close" data-close="deleteAccountDialog">×</button></div><form id="deleteAccountForm" class="utility-form"><p>Esta ação é permanente. Suas informações e seus arquivos serão excluídos.</p><label>Confirme seu endereço <input id="deleteAccountEmail" type="email" required></label><label>Digite sua senha <input id="deleteAccountPassword" type="password" required></label><label>Digite EXCLUIR <input id="deleteAccountConfirmation" autocomplete="off" required></label><div class="compose-footer"><button class="send-btn danger" type="submit">Excluir minha conta definitivamente</button></div><p id="deleteAccountMessage" class="auth-message"></p></form></dialog>
+
   <div class="toast" id="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="supabase-config.js?v=20260916-1"></script>
-    <script src="app.js?v=20260923-attachments"></script>
+  <script src="app.js?v=20260923-domain-fix-1"></script>
 </body>
 </html>
 
