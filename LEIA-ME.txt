@@ -1,0 +1,2 @@
+Correção local do IL Chats (il-chta.github.io): retorno do login Google, confirmação de cadastro e URL base apontam para https://il-chta.github.io/.
+Arquivos originais preservados fora deste pacote. Publicação e teste completo de login ainda pendentes.
