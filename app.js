@@ -2,6 +2,7 @@
    Nenhum segredo deve ser colocado neste arquivo. */
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 let sb=null,currentUser=null,currentFolder='inbox',messages=[],selectedId=null,useBrand=false,currentDraftId=null,pendingLogo=null,currentSignature={},selectedAttachments=[];
+const trashSelection=new Set();let trashDeleting=false;
 const list=$('#messageList'),reader=$('#reader'),empty=$('#readerEmpty'),content=$('#readerContent');
 const authUi={loginScreen:$('#loginScreen'),message:$('#authMessage'),signupMessage:$('#signupMessage'),resetMessage:$('#resetMessage')};
 function toast(t){const el=$('#toast');if(!el)return;el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2400)}
@@ -43,7 +44,7 @@ $('#deleteAccountTop')?.addEventListener('click',openDeleteAccount);$('#deleteAc
 $('#deleteAccountForm')?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,old=btn.textContent;if(!confirm('Tem certeza? Esta exclusão não poderá ser desfeita.'))return;btn.disabled=true;btn.textContent='Excluindo…';setAuthMessage($('#deleteAccountMessage'),'');try{const {data,error}=await sb.functions.invoke('delete-account',{body:{email:$('#deleteAccountEmail').value.trim(),password:$('#deleteAccountPassword').value,confirmation:$('#deleteAccountConfirmation').value.trim()}});if(error||!data?.ok)throw new Error(data?.error||error?.message||'Falha na exclusão');await sb.auth.signOut();$('#deleteAccountDialog').close();showLogin();setAuthMessage(authUi.message,'Sua conta foi excluída.',true)}catch(error){setAuthMessage($('#deleteAccountMessage'),error.message||'Não foi possível excluir a conta.')}finally{btn.disabled=false;btn.textContent=old}});
 function translateError(m=''){if(/Invalid login credentials/i.test(m))return 'Endereço ou senha incorretos.';if(/Email not confirmed/i.test(m))return 'A conta ainda não foi ativada.';if(/User already registered|already been registered/i.test(m))return 'Este endereço já possui uma conta.';if(/Signups not allowed|Signup is disabled|signups.*disabled/i.test(m))return 'Novos cadastros estão desativados no Supabase. Ative Allow new users to sign up em Authentication.';if(/Password should be at least/i.test(m))return 'A senha precisa ter pelo menos 8 caracteres.';return m}
 
-async function loadMailbox(){if(!sb||!currentUser)return;selectedId=null;content.classList.add('hidden');empty.classList.remove('hidden');reader.classList.remove('open');list.innerHTML='<div class="loading-mail">Carregando mensagens…</div>';
+async function loadMailbox(){if(!sb||!currentUser)return;selectedId=null;trashSelection.clear();syncTrashSelection();content.classList.add('hidden');empty.classList.remove('hidden');reader.classList.remove('open');list.innerHTML='<div class="loading-mail">Carregando mensagens…</div>';
  try{
   if(currentFolder==='drafts'){
    const {data,error}=await sb.from('drafts').select('*').order('updated_at',{ascending:false});if(error)throw error;
@@ -58,7 +59,30 @@ async function loadMailbox(){if(!sb||!currentUser)return;selectedId=null;content
  }catch(err){console.error(err);list.innerHTML='<div class="mail-error">Não foi possível carregar as mensagens.<br><small>'+esc(err.message)+'</small></div>'}
 }
 function visibleMessages(){const q=$('#searchInput').value.trim().toLowerCase();return q?messages.filter(m=>(`${m.sender} ${m.email} ${m.subject} ${m.preview}`).toLowerCase().includes(q)):messages}
-function renderList(){list.innerHTML='';const arr=visibleMessages();if(!arr.length){list.innerHTML='<div class="empty-folder">Nenhuma mensagem nesta pasta.</div>'}else arr.forEach(m=>{const el=document.createElement('div');el.className='message'+(m.id===selectedId?' selected':'')+(!m.is_read&&m.folder==='inbox'?' unread':'');el.innerHTML=`<div class="circle">${initials(m.sender)}</div><div><h4>${esc(m.sender)}</h4><strong>${esc(m.subject)}</strong><p>${esc(m.preview)}</p></div><div><time>${esc(m.time)}</time>${m.isDraft?'':'<span class="star '+(m.fav?'on':'')+'" data-star="'+m.id+'">★</span>'}</div>`;el.onclick=e=>{if(e.target.dataset.star){e.stopPropagation();toggleFav(e.target.dataset.star);return}openMessage(m.id)};list.appendChild(el)});updateCounts()}
+function renderList(){list.innerHTML='';const arr=visibleMessages();if(!arr.length){list.innerHTML='<div class="empty-folder">Nenhuma mensagem nesta pasta.</div>'}else arr.forEach(m=>{const el=document.createElement('div');el.className='message'+(m.id===selectedId?' selected':'')+(!m.is_read&&m.folder==='inbox'?' unread':'');el.innerHTML=`${currentFolder==='trash'?`<input type="checkbox" class="trash-check" data-trash-id="${esc(m.id)}" aria-label="Selecionar ${esc(m.subject)}" ${trashSelection.has(m.id)?'checked':''} ${trashDeleting?'disabled':''}>`:''}<div class="circle">${initials(m.sender)}</div><div><h4>${esc(m.sender)}</h4><strong>${esc(m.subject)}</strong><p>${esc(m.preview)}</p></div><div><time>${esc(m.time)}</time>${m.isDraft?'':'<span class="star '+(m.fav?'on':'')+'" data-star="'+m.id+'">★</span>'}</div>`;el.classList.toggle('trash-message',currentFolder==='trash');el.onclick=e=>{if(e.target.matches('.trash-check')){if(e.target.checked)trashSelection.add(m.id);else trashSelection.delete(m.id);syncTrashSelection();return}if(e.target.dataset.star){e.stopPropagation();toggleFav(e.target.dataset.star);return}openMessage(m.id)};list.appendChild(el)});syncTrashSelection();updateCounts()}
+
+function syncTrashSelection(){
+ const bar=$('#trashSelectionBar');if(!bar)return;
+ bar.classList.toggle('hidden',currentFolder!=='trash');
+ const ids=visibleMessages().filter(m=>m.folder==='trash').map(m=>m.id);
+ const all=$('#selectAllTrash'),count=ids.filter(id=>trashSelection.has(id)).length;
+ all.checked=ids.length>0&&count===ids.length;all.indeterminate=count>0&&count<ids.length;all.disabled=trashDeleting||!ids.length;
+ $('#trashSelectionCount').textContent=trashSelection.size+' selecionadas';
+ $('#deleteSelectedTrash').disabled=trashDeleting||trashSelection.size===0;
+ $('#deleteSelectedTrash').textContent=trashDeleting?'Excluindo…':'Excluir selecionadas';
+}
+$('#selectAllTrash')?.addEventListener('change',e=>{for(const m of visibleMessages().filter(m=>m.folder==='trash')){if(e.target.checked)trashSelection.add(m.id);else trashSelection.delete(m.id)}renderList()});
+$('#deleteSelectedTrash')?.addEventListener('click',async()=>{
+ if(trashDeleting||currentFolder!=='trash'||!sb||!currentUser)return;
+ const ids=messages.filter(m=>m.folder==='trash'&&trashSelection.has(m.id)).map(m=>m.id);
+ if(!ids.length||!confirm('Excluir definitivamente '+ids.length+' mensagem(ns) da sua caixa?'))return;
+ trashDeleting=true;renderList();let deleted=0,failed=0;
+ try{for(const id of ids){try{const {error}=await sb.rpc('delete_message_for_me',{p_message_id:id});if(error)throw error;deleted++;trashSelection.delete(id);messages=messages.filter(m=>m.id!==id)}catch(error){failed++;console.error('Falha ao excluir mensagem da lixeira',error)}}
+ if(ids.includes(selectedId)){selectedId=null;content.classList.add('hidden');empty.classList.remove('hidden');reader.classList.remove('open')}
+ toast(deleted+' excluída(s)'+(failed?'; '+failed+' não puderam ser excluídas. Tente novamente.':''));
+ }finally{trashDeleting=false;renderList()}
+});
+
 async function updateCounts(){if(!sb||!currentUser)return;const {count}=await sb.from('message_states').select('*',{count:'exact',head:true}).eq('folder','inbox');$('#inboxCount').textContent=count??0}
 function safeEmailHtml(value=''){const template=document.createElement('template');template.innerHTML=String(value);const allowed=new Set(['A','B','BLOCKQUOTE','BR','CODE','DIV','EM','H1','H2','H3','H4','HR','I','IMG','LI','OL','P','PRE','SPAN','STRONG','TABLE','TBODY','TD','TH','THEAD','TR','U','UL']);template.content.querySelectorAll('*').forEach(el=>{if(!allowed.has(el.tagName)){el.replaceWith(...el.childNodes);return}for(const attr of Array.from(el.attributes)){const name=attr.name.toLowerCase(),val=attr.value.trim();const keep=['alt','title','width','height','colspan','rowspan'].includes(name)||(name==='href'&&/^(https?:|mailto:)/i.test(val))||(name==='src'&&/^(https?:|cid:)/i.test(val));if(!keep)el.removeAttribute(attr.name)}if(el.tagName==='A')el.setAttribute('rel','noopener noreferrer');if(el.tagName==='IMG'){el.setAttribute('loading','lazy');el.setAttribute('referrerpolicy','no-referrer')}});return template.innerHTML}
 async function attachmentUrl(id){const {data,error}=await sb.functions.invoke('attachment-access',{body:{attachment_id:id}});if(error||!data?.url)throw error||new Error(data?.error||'Anexo indisponível');return data.url}

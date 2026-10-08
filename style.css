@@ -68,3 +68,21 @@ html,body{height:100%;overflow:hidden}.shell{height:100vh;height:100dvh;min-heig
 @keyframes mailSpark{0%{transform:translate(0,0)}25%{transform:translate(130px,28px)}50%{transform:translate(145px,150px)}75%{transform:translate(15px,170px)}100%{transform:translate(0,0)}}
 @media(max-width:700px){.mail-hero{padding:0 0 20px}.mail-logo-frame{border-radius:20px}.mail-logo{border-radius:18px}.mail-lion-orbit{border-width:2px}}
 @media(prefers-reduced-motion:reduce){.mail-logo-frame:before,.mail-lion-orbit,.mail-globe,.mail-spark{animation:none!important}}
+
+/* Lixeira: seleção em lote e ações visíveis com assuntos extensos. */
+.mail-list-panel,.reader,.reader-content{min-width:0}
+.message{grid-template-columns:52px minmax(0,1fr) auto}
+.message>div,.reader-head>div:first-child,.sender>div{min-width:0}
+.message h4,.message strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reader-head{flex-wrap:wrap}
+.reader-head>div:first-child{flex:1 1 200px}
+#readSubject,#readSender,#readEmail{overflow-wrap:anywhere}
+.reader-actions{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;max-width:100%}
+.reader-actions button{flex-shrink:0;min-width:40px;min-height:40px}
+.trash-selection{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--line)}
+.trash-selection label{display:flex;align-items:center;gap:8px}
+.trash-selection input,.trash-check{width:22px;height:22px;accent-color:var(--gold);cursor:pointer}
+.trash-selection button{padding:10px;border:1px solid var(--line);border-radius:8px;background:#0d2232;color:var(--text);cursor:pointer}
+.trash-selection button:disabled{opacity:.5;cursor:default}
+.message.trash-message{grid-template-columns:24px 40px minmax(0,1fr) auto;align-items:center;gap:8px}
+@media(max-width:760px){.message{grid-template-columns:40px minmax(0,1fr) auto}.reader-head{gap:12px}.reader-actions{width:100%;justify-content:flex-end}.message.trash-message{grid-template-columns:24px 32px minmax(0,1fr) auto}.trash-message .circle{width:32px;height:32px}.trash-selection{font-size:14px}}

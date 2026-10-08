@@ -178,6 +178,11 @@
           <button title="Filtros">☷</button><button title="Atualizar" id="refreshBtn">↻</button><button title="Mais">⋮</button>
         </div>
         <div class="tabs"><button class="tab active">Todas</button><button class="tab">Não lidas</button><button class="tab">Favoritas</button></div>
+        <div id="trashSelectionBar" class="trash-selection hidden" aria-label="Seleção da lixeira">
+          <label><input type="checkbox" id="selectAllTrash"> Selecionar todas exibidas</label>
+          <span id="trashSelectionCount" aria-live="polite">0 selecionadas</span>
+          <button type="button" id="deleteSelectedTrash" disabled>Excluir selecionadas</button>
+        </div>
         <div class="message-list" id="messageList"></div>
       </section>
 
