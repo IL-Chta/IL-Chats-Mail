@@ -1,74 +1,200 @@
-// Correção: excluir rascunhos.
-(()=>{
- if(document.getElementById('deleteDraftBtn'))return;
- let busy=false;
- const button=document.createElement('button');
- button.id='deleteDraftBtn';button.type='button';
- button.className='secondary danger hidden';
- button.textContent='Excluir rascunho';
- $('#composeDialog .compose-footer').prepend(button);
+/* IL Chats Mail v6 — Supabase Auth + caixa postal interna + preparação segura para e-mail externo.
+   Nenhum segredo deve ser colocado neste arquivo. */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+let sb=null,currentUser=null,currentFolder='inbox',messages=[],selectedId=null,useBrand=false,currentDraftId=null,pendingLogo=null,currentSignature={},selectedAttachments=[];
+const trashSelection=new Set();let trashDeleting=false;
+const list=$('#messageList'),reader=$('#reader'),empty=$('#readerEmpty'),content=$('#readerContent');
+const authUi={loginScreen:$('#loginScreen'),message:$('#authMessage'),signupMessage:$('#signupMessage'),resetMessage:$('#resetMessage')};
+function toast(t){const el=$('#toast');if(!el)return;el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2400)}
+function setAuthMessage(el,text,ok=false){if(!el)return;el.textContent=text||'';el.classList.toggle('ok',!!ok)}
+function supabaseReady(){return !!(window.supabase&&window.ILMAIL_SUPABASE_URL&&window.ILMAIL_SUPABASE_PUBLISHABLE_KEY&&window.ILMAIL_SUPABASE_PUBLISHABLE_KEY!=='COLE_AQUI_SUA_PUBLISHABLE_KEY')}
+function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+const MAIL_DOMAIN='ilchatsmail.com.br';
+function normalizeHandle(value=''){return value.trim().toLowerCase().replace(/@(?:ilchatsmail|ilchats)\.com\.br$/i,'')}
+function internalEmail(value=''){return `${normalizeHandle(value)}@${MAIL_DOMAIN}`}
+function loginEmail(value=''){const v=value.trim().toLowerCase();return v.includes('@')?v:internalEmail(v)}
+function validHandle(value=''){return /^[a-z0-9](?:[a-z0-9._-]{1,30}[a-z0-9])?$/.test(normalizeHandle(value))}
+async function sha256(value){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return [...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function makeRecoveryCode(){const b=crypto.getRandomValues(new Uint8Array(15));return [...b].map(x=>x.toString(16).padStart(2,'0')).join('').match(/.{1,5}/g).join('-').toUpperCase()}
+function initials(name='?'){return name.split(/\s+/).filter(Boolean).map(x=>x[0]).slice(0,2).join('').toUpperCase()||'?'}
+function fmtTime(d){if(!d)return '';const x=new Date(d),now=new Date();if(x.toDateString()===now.toDateString())return x.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});return x.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}
+function makeUuid(){if(globalThis.crypto?.randomUUID)return crypto.randomUUID();const b=new Uint8Array(16);if(globalThis.crypto?.getRandomValues)crypto.getRandomValues(b);else for(let i=0;i<b.length;i++)b[i]=Math.floor(Math.random()*256);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20)}
+function withTimeout(p,ms=45000){let timer;return Promise.race([p,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Tempo limite excedido. Tente novamente.')),ms)})]).finally(()=>clearTimeout(timer))}
+function sig(){return currentSignature||{}}
+async function loadBrand(){if(!sb||!currentUser)return;const {data}=await sb.from('profiles').select('signature_text,signature_logo_url').eq('id',currentUser.id).maybeSingle();try{currentSignature=JSON.parse(data?.signature_text||'{}')}catch{currentSignature={}}if(data?.signature_logo_url)currentSignature.logo=data.signature_logo_url}
+function signatureHtml(){const s=sig();if(!s.name&&!s.logo)return '';return `<div><b>${esc(s.name||'')}</b>${s.role?'<div>'+esc(s.role)+'</div>':''}${s.phone?'<div>'+esc(s.phone)+'</div>':''}${s.site?'<div>'+esc(s.site)+'</div>':''}${s.logo?'<img src="'+s.logo+'" alt="Logotipo">':''}</div>`}
 
- async function erase(id){
-  if(busy||!id||!sb||!currentUser)return;
-  if(!confirm('Excluir definitivamente este rascunho?'))return;
-  busy=true;button.disabled=true;
-  const controls=[$('#saveDraftBtn'),$('#composeForm [type="submit"]')].filter(Boolean);
-  const disabled=controls.map(b=>b.disabled);
-  controls.forEach(b=>b.disabled=true);
-  try{
-   const {data,error}=await withTimeout(
-    sb.from('drafts').delete()
-     .eq('id',id).eq('user_id',currentUser.id)
-     .select('id'),15000
-   );
-   if(error)throw error;
-   if(!data?.some(row=>row.id===id))
-    throw new Error('O banco não confirmou a exclusão.');
-   if(currentDraftId===id){
-    currentDraftId=null;
-    $('#composeDialog').close();
-    $('#composeForm').reset();
-    selectedAttachments=[];
-    renderAttachments();useBrand=false;
-    $('#signaturePreview').classList.add('hidden');
-    button.classList.add('hidden');
-   }
-   await loadMailbox();
-   toast('Rascunho excluído');
-  }catch(error){
-   toast('Não foi possível excluir: '+error.message);
-  }finally{
-   busy=false;button.disabled=false;
-   controls.forEach((b,i)=>b.disabled=disabled[i]);
+function showMailApp(user){currentUser=user;authUi.loginScreen?.classList.add('hidden');document.body.classList.add('authenticated');const email=user?.email||'';const emailEl=$('#accountEmail');if(emailEl)emailEl.textContent=email;const name=user?.user_metadata?.name||email.split('@')[0]||'Conta';const nameEl=$('#accountDisplayName');if(nameEl)nameEl.textContent=name;const fallback=$('#profileAvatarFallback');if(fallback)fallback.textContent=initials(name);Promise.allSettled([loadProfile(),loadBrand(),loadMailbox(),logVisit(),checkAdmin()]).then(results=>results.filter(x=>x.status==='rejected').forEach(x=>console.error(x.reason)))}
+function showLogin(){currentUser=null;authUi.loginScreen?.classList.remove('hidden');document.body.classList.remove('authenticated');$('#accountMenu')?.classList.add('hidden')}
+async function initAuth(){if(!supabaseReady()){showLogin();setAuthMessage(authUi.message,'Conecte a Publishable key do Supabase para ativar o IL Chats Mail.');return}sb=window.supabase.createClient(window.ILMAIL_SUPABASE_URL,window.ILMAIL_SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});const {data}=await sb.auth.getSession();if(data.session)showMailApp(data.session.user);else showLogin();sb.auth.onAuthStateChange((event,s)=>{if(event==='SIGNED_IN'&&s?.user&&s.user.id!==currentUser?.id)showMailApp(s.user);else if(event==='SIGNED_OUT')showLogin()})}
+
+$('#togglePassword')?.addEventListener('click',()=>{const i=$('#loginPassword');i.type=i.type==='password'?'text':'password'});
+$('#signupHandle')?.addEventListener('input',e=>{const handle=normalizeHandle(e.target.value);e.target.value=handle;const preview=$('#signupAddressPreview');if(preview)preview.textContent=`${handle||'seunome'}@${MAIL_DOMAIN}`});
+$('#showSignupBtn')?.addEventListener('click',()=>$('#signupDialog')?.showModal());
+$('#forgotPasswordBtn')?.addEventListener('click',()=>{if($('#loginEmail')?.value)$('#resetEmail').value=$('#loginEmail').value;$('#resetDialog')?.showModal()});
+$$('.dialog-close').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.close)?.close()));
+$('#loginForm')?.addEventListener('submit',async e=>{e.preventDefault();setAuthMessage(authUi.message,'');if(!sb)return setAuthMessage(authUi.message,'Supabase ainda não está conectado.');const email=loginEmail($('#loginEmail').value),{error}=await sb.auth.signInWithPassword({email,password:$('#loginPassword').value});setAuthMessage(authUi.message,error?translateError(error.message):'Login realizado.',!error)});
+$('#signupForm')?.addEventListener('submit',async e=>{e.preventDefault();setAuthMessage(authUi.signupMessage,'');if(!sb)return setAuthMessage(authUi.signupMessage,'Supabase ainda não está conectado.');const name=$('#signupName').value.trim(),handle=normalizeHandle($('#signupHandle').value),email=internalEmail(handle),password=$('#signupPassword').value;if(!name)return setAuthMessage(authUi.signupMessage,'Informe seu nome.');if(!validHandle(handle))return setAuthMessage(authUi.signupMessage,'Use de 3 a 32 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.');if(password.length<8)return setAuthMessage(authUi.signupMessage,'A senha precisa ter pelo menos 8 caracteres.');setAuthMessage(authUi.signupMessage,'Criando sua conta…');const code=makeRecoveryCode(),recovery_hash=await sha256(code);const {data,error}=await sb.auth.signUp({email,password,options:{data:{name,handle,recovery_hash}}});if(error)return setAuthMessage(authUi.signupMessage,translateError(error.message));if(!data?.user)return setAuthMessage(authUi.signupMessage,'Não foi possível concluir o cadastro. Tente novamente.');if(data.session){const {error:saveError}=await sb.from('recovery_credentials').upsert({user_id:data.user.id,recovery_hash});if(saveError)console.warn('Conta criada; recuperação ainda não configurada:',saveError);setAuthMessage(authUi.signupMessage,`Conta criada: ${email}. Guarde este código de recuperação em local seguro: ${code}`,true);setTimeout(()=>$('#signupDialog')?.close(),3500);return}setAuthMessage(authUi.signupMessage,'Conta criada. Se a confirmação de e-mail estiver ativada no Supabase, conclua a confirmação antes de entrar.',true)});
+$('#resetForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!sb)return;const body={email:loginEmail($('#resetEmail').value),recovery_code:$('#recoveryCode').value.trim(),new_password:$('#newPassword').value};const {data,error}=await sb.functions.invoke('recover-account',{body});setAuthMessage(authUi.resetMessage,error||!data?.ok?'Não foi possível recuperar a conta. Confira os dados e tente novamente.':`Senha alterada. Guarde seu novo código de recuperação: ${data.recovery_code}`,!error&&data?.ok)});
+$('#accountBtn')?.addEventListener('click',e=>{e.stopPropagation();$('#accountMenu')?.classList.toggle('hidden')});
+document.addEventListener('click',e=>{if(!e.target.closest('#accountMenu')&&!e.target.closest('#accountBtn'))$('#accountMenu')?.classList.add('hidden')});
+$('#logoutBtn')?.addEventListener('click',async e=>{const btn=e.currentTarget,old=btn.textContent;btn.disabled=true;btn.textContent='Saindo…';try{if(!sb)throw new Error('Sessão indisponível');const {error}=await withTimeout(sb.auth.signOut(),15000);if(error)throw error;showLogin()}catch(error){console.error(error);toast('Não foi possível sair: '+(error.message||'erro inesperado'))}finally{btn.disabled=false;btn.textContent=old}});
+function openDeleteAccount(e){e?.preventDefault();if(!currentUser)return;$('#deleteAccountEmail').value=currentUser.email||'';$('#deleteAccountPassword').value='';$('#deleteAccountConfirmation').value='';setAuthMessage($('#deleteAccountMessage'),'');$('#deleteAccountDialog').showModal()}
+$('#deleteAccountTop')?.addEventListener('click',openDeleteAccount);$('#deleteAccountSide')?.addEventListener('click',openDeleteAccount);
+$('#deleteAccountForm')?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,old=btn.textContent;if(!confirm('Tem certeza? Esta exclusão não poderá ser desfeita.'))return;btn.disabled=true;btn.textContent='Excluindo…';setAuthMessage($('#deleteAccountMessage'),'');try{const {data,error}=await sb.functions.invoke('delete-account',{body:{email:$('#deleteAccountEmail').value.trim(),password:$('#deleteAccountPassword').value,confirmation:$('#deleteAccountConfirmation').value.trim()}});if(error||!data?.ok)throw new Error(data?.error||error?.message||'Falha na exclusão');await sb.auth.signOut();$('#deleteAccountDialog').close();showLogin();setAuthMessage(authUi.message,'Sua conta foi excluída.',true)}catch(error){setAuthMessage($('#deleteAccountMessage'),error.message||'Não foi possível excluir a conta.')}finally{btn.disabled=false;btn.textContent=old}});
+function translateError(m=''){if(/Invalid login credentials/i.test(m))return 'Endereço ou senha incorretos.';if(/Email not confirmed/i.test(m))return 'A conta ainda não foi ativada.';if(/User already registered|already been registered/i.test(m))return 'Este endereço já possui uma conta.';if(/Signups not allowed|Signup is disabled|signups.*disabled/i.test(m))return 'Novos cadastros estão desativados no Supabase. Ative Allow new users to sign up em Authentication.';if(/Password should be at least/i.test(m))return 'A senha precisa ter pelo menos 8 caracteres.';return m}
+
+async function loadMailbox(){if(!sb||!currentUser)return;selectedId=null;trashSelection.clear();syncTrashSelection();content.classList.add('hidden');empty.classList.remove('hidden');reader.classList.remove('open');list.innerHTML='<div class="loading-mail">Carregando mensagens…</div>';
+ try{
+  if(currentFolder==='drafts'){
+   const {data,error}=await sb.from('drafts').select('*').order('updated_at',{ascending:false});if(error)throw error;
+   messages=(data||[]).map(d=>({id:d.id,folder:'drafts',sender:'Rascunho',email:d.to_email||'',subject:d.subject||'(sem assunto)',preview:(d.body||'').slice(0,100)||'Rascunho vazio',body:d.body||'',time:fmtTime(d.updated_at),created_at:d.updated_at,isDraft:true,fav:false}));
+  }else{
+   let q=sb.from('message_states').select('message_id,folder,is_starred,is_read,previous_folder,messages!inner(id,created_at,sender_id,recipient_id,sender_email,recipient_email,subject,body,html_body)');
+   if(currentFolder==='favorites')q=q.eq('is_starred',true);else q=q.eq('folder',currentFolder);
+   const {data,error}=await q.order('updated_at',{ascending:false});if(error)throw error;
+   messages=(data||[]).map(r=>{const m=r.messages,isSender=m.sender_id===currentUser.id;const peer=isSender?(m.recipient_email||'Destinatário'):(m.sender_email||'Remetente');return {id:m.id,folder:r.folder,sender:isSender?'Você':peer,email:peer,subject:m.subject||'(sem assunto)',preview:(m.body||'').slice(0,100),body:m.body||'',html_body:m.html_body||'',time:fmtTime(m.created_at),created_at:m.created_at,fav:r.is_starred,is_read:r.is_read,previousFolder:r.previous_folder,isSender}});
   }
- }
- button.onclick=()=>erase(currentDraftId);
+  renderList();
+ }catch(err){console.error(err);list.innerHTML='<div class="mail-error">Não foi possível carregar as mensagens.<br><small>'+esc(err.message)+'</small></div>'}
+}
+function visibleMessages(){const q=$('#searchInput').value.trim().toLowerCase();return q?messages.filter(m=>(`${m.sender} ${m.email} ${m.subject} ${m.preview}`).toLowerCase().includes(q)):messages}
+function renderList(){list.innerHTML='';const arr=visibleMessages();if(!arr.length){list.innerHTML='<div class="empty-folder">Nenhuma mensagem nesta pasta.</div>'}else arr.forEach(m=>{const el=document.createElement('div');el.className='message'+(m.id===selectedId?' selected':'')+(!m.is_read&&m.folder==='inbox'?' unread':'');el.innerHTML=`${currentFolder==='trash'?`<input type="checkbox" class="trash-check" data-trash-id="${esc(m.id)}" aria-label="Selecionar ${esc(m.subject)}" ${trashSelection.has(m.id)?'checked':''} ${trashDeleting?'disabled':''}>`:''}<div class="circle">${initials(m.sender)}</div><div><h4>${esc(m.sender)}</h4><strong>${esc(m.subject)}</strong><p>${esc(m.preview)}</p></div><div><time>${esc(m.time)}</time>${m.isDraft?'<button type="button" class="draft-delete danger-action" data-delete-draft="'+esc(m.id)+'" title="Excluir rascunho" aria-label="Excluir rascunho" style="display:block;min-width:44px;min-height:44px;margin-top:4px">🗑</button>':'<span class="star '+(m.fav?'on':'')+'" data-star="'+m.id+'">★</span>'}</div>`;el.classList.toggle('trash-message',currentFolder==='trash');el.onclick=e=>{const draftButton=e.target.closest('[data-delete-draft]');if(draftButton){e.stopPropagation();deleteDraft(draftButton.dataset.deleteDraft);return}if(e.target.matches('.trash-check')){if(e.target.checked)trashSelection.add(m.id);else trashSelection.delete(m.id);syncTrashSelection();return}if(e.target.dataset.star){e.stopPropagation();toggleFav(e.target.dataset.star);return}openMessage(m.id)};list.appendChild(el)});syncTrashSelection();updateCounts()}
 
- const oldRender=renderList;
- renderList=function(){
-  oldRender();
-  if(currentFolder!=='drafts')return;
-  const items=visibleMessages();
-  $$('#messageList .message').forEach((row,i)=>{
-   if(!items[i]?.isDraft)return;
-   const remove=document.createElement('button');
-   remove.type='button';remove.textContent='🗑';
-   remove.title='Excluir rascunho';
-   remove.setAttribute('aria-label','Excluir rascunho');
-   remove.style.cssText='display:block;min-width:44px;min-height:44px';
-   remove.onclick=e=>{
-    e.stopPropagation();
-    return erase(items[i].id);
-   };
-   row.lastElementChild.appendChild(remove);
-  });
- };
- const oldOpen=openDraft;
- openDraft=function(m){
-  oldOpen(m);button.classList.remove('hidden');
- };
- $('#composeBtn').addEventListener('click',()=>{
-  button.classList.add('hidden');
- });
- if(currentFolder==='drafts')renderList();
-})();
+function syncTrashSelection(){
+ const bar=$('#trashSelectionBar');if(!bar)return;
+ bar.classList.toggle('hidden',currentFolder!=='trash');
+ const ids=visibleMessages().filter(m=>m.folder==='trash').map(m=>m.id);
+ const all=$('#selectAllTrash'),count=ids.filter(id=>trashSelection.has(id)).length;
+ all.checked=ids.length>0&&count===ids.length;all.indeterminate=count>0&&count<ids.length;all.disabled=trashDeleting||!ids.length;
+ $('#trashSelectionCount').textContent=trashSelection.size+' selecionadas';
+ $('#deleteSelectedTrash').disabled=trashDeleting||trashSelection.size===0;
+ $('#deleteSelectedTrash').textContent=trashDeleting?'Excluindo…':'Excluir selecionadas';
+}
+$('#selectAllTrash')?.addEventListener('change',e=>{for(const m of visibleMessages().filter(m=>m.folder==='trash')){if(e.target.checked)trashSelection.add(m.id);else trashSelection.delete(m.id)}renderList()});
+$('#deleteSelectedTrash')?.addEventListener('click',async()=>{
+ if(trashDeleting||currentFolder!=='trash'||!sb||!currentUser)return;
+ const ids=messages.filter(m=>m.folder==='trash'&&trashSelection.has(m.id)).map(m=>m.id);
+ if(!ids.length||!confirm('Excluir definitivamente '+ids.length+' mensagem(ns) da sua caixa?'))return;
+ trashDeleting=true;renderList();let deleted=0,failed=0;
+ try{for(const id of ids){try{const {error}=await sb.rpc('delete_message_for_me',{p_message_id:id});if(error)throw error;deleted++;trashSelection.delete(id);messages=messages.filter(m=>m.id!==id)}catch(error){failed++;console.error('Falha ao excluir mensagem da lixeira',error)}}
+ if(ids.includes(selectedId)){selectedId=null;content.classList.add('hidden');empty.classList.remove('hidden');reader.classList.remove('open')}
+ toast(deleted+' excluída(s)'+(failed?'; '+failed+' não puderam ser excluídas. Tente novamente.':''));
+ }finally{trashDeleting=false;renderList()}
+});
+
+async function updateCounts(){if(!sb||!currentUser)return;const {count}=await sb.from('message_states').select('*',{count:'exact',head:true}).eq('folder','inbox');$('#inboxCount').textContent=count??0}
+function safeEmailHtml(value=''){const template=document.createElement('template');template.innerHTML=String(value);const allowed=new Set(['A','B','BLOCKQUOTE','BR','CODE','DIV','EM','H1','H2','H3','H4','HR','I','IMG','LI','OL','P','PRE','SPAN','STRONG','TABLE','TBODY','TD','TH','THEAD','TR','U','UL']);template.content.querySelectorAll('*').forEach(el=>{if(!allowed.has(el.tagName)){el.replaceWith(...el.childNodes);return}for(const attr of Array.from(el.attributes)){const name=attr.name.toLowerCase(),val=attr.value.trim();const keep=['alt','title','width','height','colspan','rowspan'].includes(name)||(name==='href'&&/^(https?:|mailto:)/i.test(val))||(name==='src'&&/^(https?:|cid:)/i.test(val));if(!keep)el.removeAttribute(attr.name)}if(el.tagName==='A')el.setAttribute('rel','noopener noreferrer');if(el.tagName==='IMG'){el.setAttribute('loading','lazy');el.setAttribute('referrerpolicy','no-referrer')}});return template.innerHTML}
+async function attachmentUrl(id){const {data,error}=await sb.functions.invoke('attachment-access',{body:{attachment_id:id}});if(error||!data?.url)throw error||new Error(data?.error||'Anexo indisponível');return data.url}
+function attachmentIcon(type=''){return type.startsWith('image/')?'🖼️':type.startsWith('video/')?'🎬':type==='application/pdf'?'📄':'📎'}
+async function openAttachment(button){const id=button.dataset.attachmentId,type=button.dataset.type||'',name=button.dataset.name||'anexo',preview=button.closest('.attachment-card').querySelector('.attachment-preview');button.disabled=true;button.textContent='Carregando…';try{const url=await attachmentUrl(id);preview.innerHTML='';if(type.startsWith('image/')){const img=document.createElement('img');img.src=url;img.alt=name;img.loading='lazy';preview.appendChild(img)}else if(type.startsWith('video/')){const video=document.createElement('video');video.src=url;video.controls=true;video.preload='metadata';preview.appendChild(video)}else window.open(url,'_blank','noopener');const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';link.download=name;link.textContent='Abrir ou baixar original';preview.appendChild(link);button.classList.add('hidden')}catch(error){toast('Não foi possível abrir o anexo: '+(error.message||'erro inesperado'));button.disabled=false;button.textContent='Abrir'}}
+async function openMessage(id){selectedId=id;const m=messages.find(x=>String(x.id)===String(id));if(!m)return;renderList();empty.classList.add('hidden');content.classList.remove('hidden');$('#readSubject').textContent=m.subject;$('#readSender').textContent=m.sender;$('#readEmail').textContent='<'+m.email+'>';let attached=[];if(!m.isDraft){const result=await sb.from('email_attachments').select('id,filename,content_type,size_bytes,content_id,content_disposition').eq('message_id',m.id);attached=result.data||[]}let bodyHtml=m.html_body?safeEmailHtml(m.html_body):`<p>${esc(m.body||'(mensagem sem texto)').replace(/\n/g,'<br>')}</p>`;for(const a of attached.filter(x=>x.content_id)){const token='cid:'+String(a.content_id).replace(/[<>]/g,'');if(bodyHtml.includes(token)){try{const url=await attachmentUrl(a.id);bodyHtml=bodyHtml.split(token).join(url)}catch(error){console.error('Falha ao carregar imagem inline',error)}}}const cards=attached.map(a=>`<div class="attachment-card"><div><b>${attachmentIcon(a.content_type)} ${esc(a.filename)}</b><small>${a.size_bytes?`${(a.size_bytes/1024/1024).toFixed(2)} MB`:'Tamanho não informado'}</small></div><button type="button" class="attachment-open" data-attachment-id="${esc(a.id)}" data-type="${esc(a.content_type||'')}" data-name="${esc(a.filename)}">Abrir</button><div class="attachment-preview"></div></div>`).join('');$('#readBody').innerHTML=`<div class="mail-copy"><div class="email-html">${bodyHtml}</div>${cards?`<div class="message-attachments"><h4>Anexos</h4>${cards}</div>`:''}</div>`;reader.classList.add('open');syncReaderActions();if(m.isDraft){openDraft(m);return}if(m.folder==='inbox'&&!m.is_read){await sb.from('message_states').update({is_read:true}).eq('message_id',m.id).eq('user_id',currentUser.id);m.is_read=true;renderList()}}
+$('#readBody')?.addEventListener('click',e=>{const button=e.target.closest('.attachment-open');if(button)openAttachment(button)});
+
+let draftDeleting=false;
+const draftDeleteButton=document.createElement('button');
+draftDeleteButton.type='button';
+draftDeleteButton.id='deleteDraftBtn';
+draftDeleteButton.className='secondary danger hidden';
+draftDeleteButton.textContent='🗑 Excluir rascunho';
+$('#composeDialog .compose-footer')?.prepend(draftDeleteButton);
+function syncDraftDeleteButton(){
+ draftDeleteButton.classList.toggle('hidden',!currentDraftId);
+ draftDeleteButton.disabled=draftDeleting;
+}
+draftDeleteButton.addEventListener('click',()=>deleteDraft(currentDraftId));
+async function deleteDraft(id){
+ if(draftDeleting||!id||!sb||!currentUser)return;
+ if(!confirm('Excluir definitivamente este rascunho?'))return;
+ draftDeleting=true;
+ const editingThisDraft=currentDraftId===id;
+ const controls=editingThisDraft?[$('#saveDraftBtn'),$('#composeForm [type="submit"]')].filter(Boolean):[];
+ const previousDisabled=controls.map(button=>button.disabled);
+ controls.forEach(button=>button.disabled=true);
+ syncDraftDeleteButton();
+ try{
+  const {data,error}=await withTimeout(sb.from('drafts').delete().eq('id',id).eq('user_id',currentUser.id).select('id'),15000);
+  if(error)throw error;
+  if(!data?.some(row=>row.id===id))throw new Error('O rascunho não foi excluído. Atualize a lista e tente novamente.');
+  if(currentDraftId===id){
+   currentDraftId=null;
+   $('#composeDialog').close();
+   $('#composeForm').reset();
+   selectedAttachments=[];
+   renderAttachments();
+   useBrand=false;
+   $('#signaturePreview').classList.add('hidden');
+  }
+  await loadMailbox();
+  toast('Rascunho excluído');
+ }catch(error){
+  console.error('Falha ao excluir rascunho',error);
+  toast('Não foi possível excluir o rascunho: '+(error.message||'erro inesperado'));
+ }finally{
+  draftDeleting=false;
+  controls.forEach((button,index)=>button.disabled=previousDisabled[index]);
+  syncDraftDeleteButton();
+ }
+}
+
+function selectedMessage(){return messages.find(m=>String(m.id)===String(selectedId))}
+function syncReaderActions(){const m=selectedMessage();if(!m)return;const inTrash=m.folder==='trash';$('#restoreReadBtn')?.classList.toggle('hidden',!inTrash);$('#permanentDeleteBtn')?.classList.toggle('hidden',!inTrash);$('#deleteReadBtn')?.classList.toggle('hidden',inTrash||m.isDraft);$('#favoriteReadBtn')?.classList.toggle('hidden',m.isDraft);if($('#favoriteReadBtn'))$('#favoriteReadBtn').textContent=m.fav?'★':'☆'}
+async function toggleFav(id){const m=messages.find(x=>String(x.id)===String(id));if(!m||m.isDraft)return;const next=!m.fav;const {error}=await sb.from('message_states').update({is_starred:next}).eq('message_id',m.id).eq('user_id',currentUser.id);if(error)return toast('Não foi possível atualizar o favorito');m.fav=next;renderList();syncReaderActions()}
+$('#favoriteReadBtn')?.addEventListener('click',()=>{const m=selectedMessage();if(m)toggleFav(m.id)});
+$('#deleteReadBtn')?.addEventListener('click',async()=>{const m=selectedMessage();if(!m)return;const {error}=await sb.from('message_states').update({previous_folder:m.folder,folder:'trash'}).eq('message_id',m.id).eq('user_id',currentUser.id);if(error)return toast('Não foi possível mover para a Lixeira');toast('Mensagem movida para a Lixeira');loadMailbox()});
+$('#restoreReadBtn')?.addEventListener('click',async()=>{const m=selectedMessage();if(!m)return;const folder=m.previousFolder||'inbox';const {error}=await sb.from('message_states').update({folder,previous_folder:null}).eq('message_id',m.id).eq('user_id',currentUser.id);if(error)return toast('Não foi possível restaurar');toast('Mensagem restaurada');loadMailbox()});
+$('#permanentDeleteBtn')?.addEventListener('click',async()=>{const m=selectedMessage();if(!m||!confirm('Excluir esta mensagem definitivamente da sua caixa?'))return;const {error}=await sb.rpc('delete_message_for_me',{p_message_id:m.id});if(error)return toast('Não foi possível excluir');toast('Mensagem excluída da sua caixa');loadMailbox()});
+$('#mobileBackBtn')?.addEventListener('click',()=>reader.classList.remove('open'));
+
+$$('.folder').forEach(b=>b.onclick=()=>{$$('.folder').forEach(x=>x.classList.remove('active'));b.classList.add('active');currentFolder=b.dataset.folder;loadMailbox()});
+$('#searchInput')?.addEventListener('input',renderList);$('#refreshBtn')?.addEventListener('click',()=>{loadMailbox();toast('Caixa atualizada')});
+$$('.tab').forEach((tab,i)=>tab.addEventListener('click',()=>{$$('.tab').forEach(t=>t.classList.remove('active'));tab.classList.add('active');currentFolder=i===2?'favorites':'inbox';$$('.folder').forEach(x=>x.classList.toggle('active',x.dataset.folder===currentFolder));loadMailbox()}));
+
+$('#composeBtn')?.addEventListener('click',()=>{currentDraftId=null;syncDraftDeleteButton();selectedAttachments=[];$('#composeForm').reset();renderAttachments();$('#signaturePreview').classList.add('hidden');useBrand=false;$('#composeDialog').showModal()});
+$('#composeForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!sb||!currentUser)return toast('Sua sessão expirou. Entre novamente.');const btn=e.submitter||e.currentTarget.querySelector('[type="submit"]'),old=btn?.textContent||'Enviar';if(btn?.disabled)return;if(btn){btn.disabled=true;btn.textContent='Enviando…'}try{const to=$('#toInput').value.trim(),subject=$('#subjectInput').value.trim()||'(sem assunto)';if(!to)throw new Error('Informe o destinatário');let body=$('#bodyInput').value;const {data:recipientId,error:recipientError}=await withTimeout(sb.rpc('resolve_mail_recipient',{p_email:to}),15000);if(recipientError)throw recipientError;const recipient=recipientId?{id:recipientId}:null;if(useBrand&&recipient){const s=sig();body+='\n\n'+[s.name,s.role,s.phone,s.site].filter(Boolean).join('\n')}const messageId=makeUuid();const {data:draft,error:createError}=await withTimeout(sb.from('messages').insert({id:messageId,thread_id:messageId,sender_id:currentUser.id,recipient_id:recipient?.id||null,sender_email:currentUser.email,recipient_email:to,to_emails:[to],subject,body,direction:recipient?'internal':'outbound',status:'draft'}).select('id').single(),20000);if(createError)throw createError;const attachmentFiles=Array.from($('#attachInput').files||[]);const totalAttachmentBytes=attachmentFiles.reduce((sum,file)=>sum+file.size,0);if(attachmentFiles.length>20)throw new Error('Envie no máximo 20 arquivos por mensagem');if(totalAttachmentBytes>35*1024*1024)throw new Error('Os anexos juntos devem ter no máximo 35 MB');for(const file of attachmentFiles){if(file.size>30*1024*1024)throw new Error('Cada anexo deve ter no máximo 30 MB');const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_'),path=draft.id+'/'+makeUuid()+'-'+safe;const up=await withTimeout(sb.storage.from('mail-attachments').upload(path,file,{contentType:file.type||'application/octet-stream'}),45000);if(up.error)throw up.error;const meta=await withTimeout(sb.from('email_attachments').insert({message_id:draft.id,owner_id:currentUser.id,storage_path:path,filename:file.name,content_type:file.type||'application/octet-stream',size_bytes:file.size}),15000);if(meta.error)throw meta.error}if(recipient){const {error}=await withTimeout(sb.rpc('finalize_internal_message',{p_message_id:draft.id}),20000);if(error)throw error}else{let r;try{r=await withTimeout(sb.functions.invoke('send-external-email',{body:{message_id:draft.id}}),45000)}catch(invokeError){const check=await sb.from('messages').select('status,failure_reason').eq('id',draft.id).maybeSingle();if(check.data?.status!=='sent')throw invokeError;r={data:{ok:true,recovered:true}}}if(r?.error||!r?.data?.ok){const check=await sb.from('messages').select('status,failure_reason').eq('id',draft.id).maybeSingle();if(check.data?.status!=='sent')throw r?.error||new Error(r?.data?.error||check.data?.failure_reason||'O provedor não confirmou o envio')}}if(currentDraftId)await sb.from('drafts').delete().eq('id',currentDraftId);$('#composeDialog').close();e.target.reset();useBrand=false;currentDraftId=null;toast('Mensagem enviada');currentFolder='sent';$$('.folder').forEach(x=>x.classList.toggle('active',x.dataset.folder==='sent'));try{await loadMailbox()}catch(refreshError){console.error('Mensagem enviada; falha apenas ao atualizar a caixa',refreshError)}}catch(error){console.error('Falha no envio',error);toast('Não foi possível enviar: '+(error.message||'erro inesperado'))}finally{if(btn){btn.disabled=false;btn.textContent=old}}});
+$('#saveDraftBtn')?.addEventListener('click',async()=>{if(!sb)return;const payload={user_id:currentUser.id,to_email:$('#toInput').value.trim()||null,subject:$('#subjectInput').value.trim()||null,body:$('#bodyInput').value,updated_at:new Date().toISOString()};let error;if(currentDraftId)({error}=await sb.from('drafts').update(payload).eq('id',currentDraftId));else({error}=await sb.from('drafts').insert(payload));if(error)return toast('Não foi possível salvar o rascunho');$('#composeDialog').close();toast('Rascunho salvo');currentFolder='drafts';$$('.folder').forEach(x=>x.classList.toggle('active',x.dataset.folder==='drafts'));loadMailbox()});
+function openDraft(m){$('#composeDialog').showModal();currentDraftId=m.id;syncDraftDeleteButton();$('#toInput').value=m.email||'';$('#subjectInput').value=m.subject==='(sem assunto)'?'':m.subject;$('#bodyInput').value=m.body||'';reader.classList.remove('open')}
+
+$('#brandToggle')?.addEventListener('click',()=>{const hasBrand=!!signatureHtml();if(!hasBrand){loadSettings();$('#settingsDialog').showModal();toast('Configure sua marca uma vez; depois você poderá ativá-la em cada e-mail.');return}useBrand=!useBrand;const p=$('#signaturePreview');$('#brandToggle').classList.toggle('brand-active',useBrand);if(useBrand){p.innerHTML=signatureHtml();p.classList.remove('hidden')}else p.classList.add('hidden')});
+$('#brandEditBtn')?.addEventListener('click',()=>{loadSettings();$('#settingsDialog').showModal()});
+function renderAttachments(){const box=$('#attachmentList'),info=$('#attachInfo');if(!box||!info)return;info.textContent=selectedAttachments.length?`${selectedAttachments.length} arquivo(s) selecionado(s)`:'';box.innerHTML=selectedAttachments.map((f,i)=>`<div class="attachment-chip"><span>📎 ${esc(f.name)} — ${(f.size/1024/1024).toFixed(f.size>1048576?1:2)} MB</span><button type="button" data-remove-attachment="${i}" aria-label="Remover ${esc(f.name)}">×</button></div>`).join('');}
+function syncAttachmentInput(){const input=$('#attachInput');if(!input||typeof DataTransfer==='undefined')return;const dt=new DataTransfer();selectedAttachments.forEach(f=>dt.items.add(f));input.files=dt.files;}
+$('#attachInput')?.addEventListener('change',e=>{for(const f of Array.from(e.target.files||[])){if(selectedAttachments.length>=20){toast('Limite de 20 arquivos por mensagem');break}const duplicate=selectedAttachments.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified);if(!duplicate)selectedAttachments.push(f)}syncAttachmentInput();renderAttachments()});
+$('#attachmentList')?.addEventListener('click',e=>{const b=e.target.closest('[data-remove-attachment]');if(!b)return;selectedAttachments.splice(Number(b.dataset.removeAttachment),1);syncAttachmentInput();renderAttachments()});
+$('#settingsBtn')?.addEventListener('click',()=>{loadSettings();$('#settingsDialog').showModal()});
+function loadSettings(){const s=sig();$('#sigName').value=s.name||'';$('#sigRole').value=s.role||'';$('#sigPhone').value=s.phone||'';$('#sigSite').value=s.site||'';$('#savedLogo').innerHTML=s.logo?`<img src="${s.logo}" alt="Logo salvo">`:''}
+$('#sigLogo')?.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{pendingLogo=r.result;$('#savedLogo').innerHTML=`<img src="${pendingLogo}" alt="Prévia">`};r.readAsDataURL(f)});
+$('#settingsForm')?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter||e.currentTarget.querySelector('[type="submit"]'),old=btn?.textContent||'Salvar';if(btn?.disabled)return;if(btn){btn.disabled=true;btn.textContent='Salvando…'}try{const oldSig=sig(),logoFile=$('#sigLogo').files?.[0];let logo=oldSig.logo||'';if(logoFile){if(!logoFile.type.startsWith('image/'))throw new Error('Escolha uma imagem para o logotipo');if(logoFile.size>5*1024*1024)throw new Error('O logotipo deve ter no máximo 5 MB');const ext=(logoFile.name.split('.').pop()||'png').replace(/[^a-z0-9]/gi,'');const path=currentUser.id+'/signature-logo.'+ext;const up=await withTimeout(sb.storage.from('profile-avatars').upload(path,logoFile,{upsert:true,contentType:logoFile.type||'image/png'}),30000);if(up.error)throw up.error;logo=sb.storage.from('profile-avatars').getPublicUrl(path).data.publicUrl+'?v='+Date.now()}const s={name:$('#sigName').value,role:$('#sigRole').value,phone:$('#sigPhone').value,site:$('#sigSite').value,logo};const {error}=await withTimeout(sb.from('profiles').update({signature_text:JSON.stringify({name:s.name,role:s.role,phone:s.phone,site:s.site}),signature_logo_url:s.logo||null}).eq('id',currentUser.id),15000);if(error)throw error;currentSignature=s;pendingLogo=null;$('#settingsDialog').close();toast('Sua marca foi salva com segurança')}catch(error){console.error('Falha ao salvar assinatura',error);toast('Não foi possível salvar sua marca: '+(error.message||'erro inesperado'))}finally{if(btn){btn.disabled=false;btn.textContent=old}}});
+
+$$('.reply-actions button').forEach((btn,i)=>btn.addEventListener('click',()=>{const m=selectedMessage();if(!m||m.isDraft)return;$('#composeDialog').showModal();currentDraftId=null;if(i===2){$('#toInput').value='';$('#subjectInput').value=m.subject.startsWith('Enc:')?m.subject:'Enc: '+m.subject;$('#bodyInput').value='\n\n--- Mensagem encaminhada ---\n'+m.body}else{$('#toInput').value=m.email||'';$('#subjectInput').value=m.subject.startsWith('Re:')?m.subject:'Re: '+m.subject;$('#bodyInput').value='\n\n--- Mensagem original ---\n'+m.body}}));
+$('#aboutBtn')?.addEventListener('click',()=>$('#aboutDialog').showModal());$('#proMailBtn')?.addEventListener('click',()=>$('#proMailDialog').showModal());
+
+async function checkAdmin(){if(!sb||!currentUser)return;const {data}=await sb.from('admins').select('user_id').eq('user_id',currentUser.id).maybeSingle();$('#adminBtn')?.classList.toggle('hidden',!data)}
+$('#adminBtn')?.addEventListener('click',async()=>{if(!sb)return;$('#adminDialog').showModal();$('#adminStats').innerHTML='<div class="loading-mail">Carregando estatísticas…</div>';const {data,error}=await sb.rpc('admin_dashboard');if(error){$('#adminStats').innerHTML='<div class="mail-error">'+esc(error.message)+'</div>';return}const d=data||{},countries=d.countries||[];$('#adminStats').innerHTML=`<div class="admin-cards"><div><b>${d.registered_accounts||0}</b><span>Contas cadastradas</span></div><div><b>${d.visits||0}</b><span>Visitas registradas</span></div><div><b>${d.leads||0}</b><span>Leads</span></div><div><b>${d.customers||0}</b><span>Clientes finalizados</span></div><div><b>${d.lead_conversion||0}%</b><span>Leads que viraram clientes</span></div><div><b>${d.active_7d||0}</b><span>Ativos nos últimos 7 dias</span></div><div><b>${d.messages_sent||0}</b><span>Mensagens enviadas</span></div></div><h3>Visitas por país/região do navegador</h3><div class="country-list">${countries.length?countries.map(c=>`<div><span>${esc(c.country_code||'--')}</span><b>${c.count}</b></div>`).join(''):'<small>Ainda não há dados.</small>'}</div><p class="admin-note">Por privacidade, esta versão não coleta IP nem localização precisa. O país/região é aproximado pelo idioma/região informado pelo navegador.</p>`});
+async function logVisit(){if(!sb||!currentUser||sessionStorage.getItem('ilmail_visit_logged'))return;let cc='--';const loc=navigator.language||'';if(loc.includes('-'))cc=loc.split('-').pop().toUpperCase();const {error}=await sb.from('visits').insert({user_id:currentUser.id,country_code:cc,locale:loc});if(!error)sessionStorage.setItem('ilmail_visit_logged','1')}
+
+
+/* v11 — perfil, contatos, calendário e notas */
+async function loadProfile(){if(!sb||!currentUser)return;const {data,error}=await sb.from('profiles').select('name,avatar_url').eq('id',currentUser.id).maybeSingle();if(error)throw error;const name=data?.name||currentUser.user_metadata?.name||currentUser.email?.split('@')[0]||'Conta';$('#accountDisplayName').textContent=name;$('#profileAvatarFallback').textContent=initials(name);const img=$('#profileAvatarImg');if(data?.avatar_url){img.onerror=()=>{img.hidden=true;$('#profileAvatarFallback').hidden=false};img.onload=()=>{img.hidden=false;$('#profileAvatarFallback').hidden=true};img.src=data.avatar_url}else{img.removeAttribute('src');img.hidden=true;$('#profileAvatarFallback').hidden=false}}
+$('#profileBtn')?.addEventListener('click',async()=>{$('#accountMenu')?.classList.add('hidden');const {data,error}=await sb.from('profiles').select('name,avatar_url').eq('id',currentUser.id).maybeSingle();if(error){toast('Não foi possível carregar o perfil: '+error.message);return}$('#profileName').value=data?.name||currentUser.user_metadata?.name||'';$('#profilePhoto').value='';$('#profileDialog').showModal()});
+$('#profileForm')?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter||e.currentTarget.querySelector('[type="submit"]'),old=btn?.textContent||'Salvar perfil';if(btn?.disabled)return;if(btn){btn.disabled=true;btn.textContent='Salvando…'}try{const name=$('#profileName').value.trim();if(!name)throw new Error('Informe seu nome');let avatar_url;const file=$('#profilePhoto').files?.[0];if(file){if(!file.type.startsWith('image/'))throw new Error('Escolha um arquivo de imagem');if(file.size>5*1024*1024)throw new Error('A foto deve ter no máximo 5 MB');const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'');const path=currentUser.id+'/avatar.'+ext;const up=await withTimeout(sb.storage.from('profile-avatars').upload(path,file,{upsert:true,contentType:file.type||'image/jpeg'}),30000);if(up.error)throw up.error;avatar_url=sb.storage.from('profile-avatars').getPublicUrl(path).data.publicUrl+'?v='+Date.now()}const payload={id:currentUser.id,email:currentUser.email,name,updated_at:new Date().toISOString()};if(avatar_url)payload.avatar_url=avatar_url;const {error}=await withTimeout(sb.from('profiles').upsert(payload),15000);if(error)throw error;const authUpdate=await withTimeout(sb.auth.updateUser({data:{...currentUser.user_metadata,name}}),15000);if(authUpdate.error)throw authUpdate.error;currentUser.user_metadata={...currentUser.user_metadata,name};await loadProfile();$('#profileDialog').close();toast('Perfil atualizado')}catch(error){console.error('Falha ao salvar perfil',error);toast('Não foi possível salvar o perfil: '+(error.message||'erro inesperado'))}finally{if(btn){btn.disabled=false;btn.textContent=old}}});
+
+function clearContact(){['contactId','contactName','contactEmail','contactPhone'].forEach(id=>$('#'+id).value='')}
+async function loadContacts(){const {data,error}=await sb.from('contacts').select('*').order('name');if(error)return toast('Não foi possível carregar contatos');const box=$('#contactsList');box.innerHTML=(data||[]).length?(data||[]).map(c=>`<div class="utility-item"><div><b>${esc(c.name)}</b><small>${esc(c.email)}${c.phone?' • '+esc(c.phone):''}</small></div><div class="utility-actions"><button data-contact-email="${esc(c.email)}">✉</button><button data-contact-edit="${c.id}">Editar</button><button class="danger" data-contact-delete="${c.id}">Excluir</button></div></div>`).join(''):'<div class="empty-folder">Nenhum contato cadastrado.</div>';box._rows=data||[]}
+$('#contactsBtn')?.addEventListener('click',()=>{$('#contactsDialog').showModal();clearContact();loadContacts()});$('#contactClear')?.addEventListener('click',clearContact);
+$('#contactForm')?.addEventListener('submit',async e=>{e.preventDefault();const id=$('#contactId').value,payload={user_id:currentUser.id,name:$('#contactName').value.trim(),email:$('#contactEmail').value.trim().toLowerCase(),phone:$('#contactPhone').value.trim()||null,updated_at:new Date().toISOString()};const q=id?sb.from('contacts').update(payload).eq('id',id):sb.from('contacts').insert(payload);const {error}=await q;if(error)return toast('Não foi possível salvar o contato: '+error.message);clearContact();loadContacts();toast('Contato salvo')});
+$('#contactsList')?.addEventListener('click',async e=>{const email=e.target.dataset.contactEmail,id=e.target.dataset.contactEdit||e.target.dataset.contactDelete;if(email){$('#contactsDialog').close();$('#composeBtn').click();$('#toInput').value=email;return}if(e.target.dataset.contactEdit){const c=e.currentTarget._rows.find(x=>x.id===id);if(c){$('#contactId').value=c.id;$('#contactName').value=c.name;$('#contactEmail').value=c.email;$('#contactPhone').value=c.phone||''}}else if(e.target.dataset.contactDelete&&confirm('Excluir este contato?')){const {error}=await sb.from('contacts').delete().eq('id',id);if(error)return toast('Não foi possível excluir');loadContacts()}});
+
+function clearCalendar(){['calendarId','calendarTitle','calendarWhen','calendarDescription'].forEach(id=>$('#'+id).value='')}
+async function loadCalendar(){const {data,error}=await sb.from('calendar_events').select('*').order('starts_at');if(error)return toast('Não foi possível carregar o calendário');const box=$('#calendarList');box.innerHTML=(data||[]).length?(data||[]).map(x=>`<div class="utility-item"><div><b>${esc(x.title)}</b><small>${new Date(x.starts_at).toLocaleString('pt-BR')}${x.description?' • '+esc(x.description):''}</small></div><div class="utility-actions"><button data-cal-edit="${x.id}">Editar</button><button class="danger" data-cal-delete="${x.id}">Excluir</button></div></div>`).join(''):'<div class="empty-folder">Nenhum compromisso cadastrado.</div>';box._rows=data||[]}
+$('#calendarBtn')?.addEventListener('click',()=>{$('#calendarDialog').showModal();clearCalendar();loadCalendar()});$('#calendarClear')?.addEventListener('click',clearCalendar);
+$('#calendarForm')?.addEventListener('submit',async e=>{e.preventDefault();const id=$('#calendarId').value,payload={user_id:currentUser.id,title:$('#calendarTitle').value.trim(),starts_at:new Date($('#calendarWhen').value).toISOString(),description:$('#calendarDescription').value.trim()||null,updated_at:new Date().toISOString()};const {error}=await(id?sb.from('calendar_events').update(payload).eq('id',id):sb.from('calendar_events').insert(payload));if(error)return toast('Não foi possível salvar: '+error.message);clearCalendar();loadCalendar();toast('Compromisso salvo')});
+$('#calendarList')?.addEventListener('click',async e=>{const id=e.target.dataset.calEdit||e.target.dataset.calDelete;if(!id)return;if(e.target.dataset.calEdit){const x=e.currentTarget._rows.find(v=>v.id===id);if(x){$('#calendarId').value=x.id;$('#calendarTitle').value=x.title;const d=new Date(x.starts_at);$('#calendarWhen').value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);$('#calendarDescription').value=x.description||''}}else if(confirm('Excluir este compromisso?')){const {error}=await sb.from('calendar_events').delete().eq('id',id);if(error)return toast('Não foi possível excluir');loadCalendar()}});
+
+function clearNote(){['noteId','noteTitle','noteBody'].forEach(id=>$('#'+id).value='')}
+async function loadNotes(){const {data,error}=await sb.from('notes').select('*').order('updated_at',{ascending:false});if(error)return toast('Não foi possível carregar notas');const box=$('#notesList');box.innerHTML=(data||[]).length?(data||[]).map(n=>`<div class="utility-item"><div><b>${esc(n.title)}</b><small>${esc((n.body||'').slice(0,100))}</small></div><div class="utility-actions"><button data-note-edit="${n.id}">Editar</button><button class="danger" data-note-delete="${n.id}">Excluir</button></div></div>`).join(''):'<div class="empty-folder">Nenhuma nota cadastrada.</div>';box._rows=data||[]}
+$('#notesBtn')?.addEventListener('click',()=>{$('#notesDialog').showModal();clearNote();loadNotes()});$('#noteClear')?.addEventListener('click',clearNote);
+$('#noteForm')?.addEventListener('submit',async e=>{e.preventDefault();const id=$('#noteId').value,payload={user_id:currentUser.id,title:$('#noteTitle').value.trim(),body:$('#noteBody').value,updated_at:new Date().toISOString()};const {error}=await(id?sb.from('notes').update(payload).eq('id',id):sb.from('notes').insert(payload));if(error)return toast('Não foi possível salvar: '+error.message);clearNote();loadNotes();toast('Nota salva')});
+$('#notesList')?.addEventListener('click',async e=>{const id=e.target.dataset.noteEdit||e.target.dataset.noteDelete;if(!id)return;if(e.target.dataset.noteEdit){const n=e.currentTarget._rows.find(v=>v.id===id);if(n){$('#noteId').value=n.id;$('#noteTitle').value=n.title;$('#noteBody').value=n.body}}else if(confirm('Excluir esta nota?')){const {error}=await sb.from('notes').delete().eq('id',id);if(error)return toast('Não foi possível excluir');loadNotes()}});
+
+initAuth();
